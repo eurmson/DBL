@@ -1,11 +1,12 @@
 #![allow(unused)]
-mod file_management;
+
 mod repository_hiding;
+mod file_system_hiding;
+mod algorithm_hiding;
 
 use std::env;
 use std::process;
-
-
+use crate::file_system_hiding::file_management;
 
 fn main() {
     // Parse command line arguments
