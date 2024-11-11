@@ -1,6 +1,7 @@
 Starting a README so that we can keep track of all commits and changes.
 
-11/3/24 6:33 PM I added a Cargo.toml file with the project name: Final_project_test that will be appended later.\
+11/3/24 6:33\
+PM I added a Cargo.toml file with the project name: Final_project_test that will be appended later.\
 I also added the main.rs file, which handles the input handler and output handling modules. In this file, I got the minimal prototype to work for initializing an empty repository.\
 Both the input and output handlers are done within the main file, which is also in charge of building the project. \
 I also added the file_management.rs file that I made to test the functionality of the input and output handling modules.\
@@ -10,4 +11,10 @@ To run the main file, just use the command: cargo run -- init. This will create 
 If the user were to enter a command that is not cargo run -- init, for example if the user's input was: cargo run -- blank, the output of the file would be: Unknown command: 'blank'.\ 
 The rest of the prototype will be implemented later, but this is a good start. - George \
 \
-11/4/24 12:25 PM Moved source code to src folder. - Ethan
+11/4/24 12:25 PM
+Moved source code to src folder. - Ethan
+
+11/11/24 10:30 AM\
+Moved A.1 Submodules into a directory.\
+Added algorithm hiding modules file and implemented Unique ID - Implementation may be updated further.\
+Began implementing file version storage.  
