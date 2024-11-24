@@ -1,10 +1,4 @@
-#![allow(unused)]
 use std::fs;
-use serde_json::json;
-use serde_json::{Value, Error};
-use std::fs::File;
-use std::io::prelude::*;
-use std::io::{BufWriter, Write};
 
 pub fn initialize_repository(repo_name: &str) -> std::io::Result<()> {
     fs::create_dir(repo_name)?;
@@ -12,17 +6,60 @@ pub fn initialize_repository(repo_name: &str) -> std::io::Result<()> {
     Ok(())
 }
 
-pub fn create_hidden_dir(dir_name: &str) -> std::io::Result<()> {
-    fs::create_dir(dir_name)?;
-    println!("Created new folder for dbl internal info {}.", dir_name);
-    Ok(())
-}
+mod file_management {
+    use directories::UserDirs;
+    use std::collections::HashMap;
+    use std::fs;
+    use std::path::Path;
+    use std::io::Result;
+    struct Directory {
+        directory: HashMap<String, bool>,
+    }
+    trait Files {
+        fn start_dir(path_id: &Path) -> std::io::Result<()>;
+        fn write_to_file(file_id: &Path, addition: &str) -> Result<()>;
+        fn read_file(file_id: &Path) -> Result<Vec<u8>>;
+        fn remove_file(file_id: &Path) -> Result<()>;
+        fn create_file(file_id: &Path, is_hidden: bool) -> Result<()>;
+        fn copy_file(source: &Path, destination: &Path) -> std::result::Result<(), &'static str>;
+    }
 
-pub fn write_to_file(file_name: &str, repo_name: &str, data: &str) -> std::io::Result<()>{
-    let parsed: Value = serde_json::from_str(data)?;
-    let mut file = fs::File::create(format!("{}/.dbl_info/{}", repo_name, file_name).as_str())?;
-    let mut writer = BufWriter::new(file);
-    serde_json::to_writer(&mut writer, &parsed)?;
-    writer.flush()?;
-    Ok(())
+    impl Files for Directory {
+        fn start_dir(path_id: &Path) -> Result<()> {
+            return fs::create_dir(path_id);
+        }
+        fn write_to_file(file_id: &Path, addition: &str) -> std::io::Result<()> {
+            return fs::write(file_id, addition);
+        }
+        fn read_file(file_id: &Path) -> Result<Vec<u8>> {
+            return fs::read(file_id);
+        }
+        fn remove_file(file_id: &Path) -> std::io::Result<()> {
+            return fs::remove_file(file_id);
+        }
+        fn create_file(file_id: &Path, is_hidden: bool) -> Result<()> {
+            let mut file = fs::File::create(file_id)?;
+            Ok(())
+        }
+        fn copy_file(source: &Path, destination: &Path) -> std::result::Result<(), &'static str> {
+            fs::File::create(destination);
+            Ok(())
+        }
+    }
+
+    trait Repo {
+        fn init(repo_name: &str) -> Result<()>;
+    }
+
+    struct Attributes {
+        repo_list: HashMap<i32, directories::UserDirs>,
+    }
+
+    impl Repo for Attributes {
+        fn init(repo_name: &str) -> Result<()> {
+            let repo_name = fs::create_dir(repo_name)?;
+            Ok(())
+        }
+
+    }
 }
