@@ -84,12 +84,12 @@ mod tests {
         create_file_log::<file_management::Directory>();
         let wtf_ctx = MockDirectory::write_to_file_context();
         wtf_ctx.expect().once()
-            .return_once(|x, x1| {
+            .return_once(|x, x1, x2| {
                 println!("{:?}, {:?}", x, x1);
                 Ok(())
             });
         wtf_ctx.expect().once()
-            .return_once(|x, x1| {
+            .return_once(|x, x1, x2| {
                 println!("{:?}, {:?}", x, x1);
                 Err(std::io::Error::new(ErrorKind::Other, "test"))
             });
@@ -103,7 +103,7 @@ mod tests {
     fn test_init_already_initialized() {
         let wtf_ctx = MockDirectory::write_to_file_context();
         wtf_ctx.expect().once()
-            .return_once(|x, x1| {
+            .return_once(|x, x1, x2| {
                 println!("{:?}, {:?}", x, x1);
                 Err(std::io::Error::new(ErrorKind::Other, "test"))
             });
