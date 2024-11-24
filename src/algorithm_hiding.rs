@@ -2,7 +2,7 @@ use std::io::{Lines, Read};
 use std::str::from_utf8;
 use serde_json;
 use serde::{Deserialize, Serialize};
-use std::time::{UNIX_EPOCH, SystemTime};
+use std::time::{UNIX_EPOCH, SystemTime, Duration};
 
 #[derive(Deserialize, Serialize, Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct UniqueId {
@@ -17,6 +17,7 @@ impl UniqueId {
 
 pub fn create_unique_id() -> UniqueId {
     let time = SystemTime::now();
+    std::thread::sleep(Duration::from_millis(1));
     let a = time.duration_since(UNIX_EPOCH).unwrap().as_nanos();
     UniqueId {
         bytes: a.to_be_bytes(),
