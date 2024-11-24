@@ -60,12 +60,12 @@ pub fn create_file_log<T>() -> impl FileLog where T: Files {
 //     use crate::file_system_hiding::file_log::create_file_log;
 //     use std::io::{ErrorKind, Result};
 //     use std::path::Path;
-//
+//     use crate::file_system_hiding::file_management;
 //
 //     #[test]
 //     fn test_init() {
 //         MockFiles::new();
-//
+//         create_file_log::<file_management::Directory>();
 //         let wtf_ctx = MockFiles::write_to_file_context();
 //         wtf_ctx.expect().once()
 //             .return_once(|x, x1| {
