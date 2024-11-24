@@ -16,6 +16,7 @@ trait Serializable{
 struct RGData{
     // Min requirements for the RG Data struct:
     // 1. A list of file names tracked for given revision. Addition/removal of files from tracking list affects this
+    // TODO: Change this vector to a hashmap which stores some unique IDs with the files being tracked for given revision
     track_list: Vec<String>,
 }
 
@@ -169,6 +170,7 @@ impl Serializable for RevGraph{
     fn serialize(&self, file_name: String, repo_name: String) -> std::result::Result<(), Error>{
         let rg_str = "{}".to_string();
         if self.graph.is_empty(){
+            // TODO: Call file_management's create file first and then call write to file
             if let Err(e) = file_management::write_to_file(file_name, repo_name, rg_str){
                 eprintln!("Failed to create/write to file: {}", e);
             }
