@@ -9,6 +9,12 @@ pub struct UniqueId {
     bytes: [u8; 16],
 }
 
+impl UniqueId {
+    pub fn into_string(self) -> String {
+        self.bytes.iter().map(|&b| format!("{:x}", b)).collect::<String>()
+    }
+}
+
 pub fn create_unique_id() -> UniqueId {
     let time = SystemTime::now();
     let a = time.duration_since(UNIX_EPOCH).unwrap().as_nanos();
