@@ -47,7 +47,7 @@ impl<T> FileLog for DBLFileLog<T>  where T: Files{
     }
 }
 
-fn create_file_log<T>() -> impl FileLog where T: Files {
+pub fn create_file_log<T>() -> impl FileLog where T: Files {
     DBLFileLog::<T>{ initialized: false, _t:None}
 }
 

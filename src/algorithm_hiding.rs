@@ -4,7 +4,7 @@ use serde_json;
 use serde::{Deserialize, Serialize};
 use std::time::{UNIX_EPOCH, SystemTime};
 
-#[derive(Deserialize, Serialize, Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Deserialize, Serialize, Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct UniqueId {
     bytes: [u8; 16],
 }
