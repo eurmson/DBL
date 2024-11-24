@@ -120,7 +120,7 @@ mod tests {
         let rf_ctx = MockDirectory::read_file_context();
         let cf_ctx = MockDirectory::create_file_context();
 
-        rf_ctx.expect().once().return_once(move |x| {
+        rf_ctx.expect().once().return_once(move |x, x1| {
             assert_eq!(x, test_file_name);
             Ok(test_file_content.bytes().collect())
         });
@@ -128,12 +128,12 @@ mod tests {
             assert_eq!(x.parent().unwrap(), test_file_name);
             Ok(())
         });
-        wtf_ctx.expect().once().returning(move |x, x1| {
+        wtf_ctx.expect().once().returning(move |x, x1, x2| {
             assert_eq!(x.parent().unwrap(), test_file_name);
             assert_eq!(x1, test_file_content);
             Ok(())
         });
-        rf_ctx.expect().once().return_once(move |x| {
+        rf_ctx.expect().once().return_once(move |x, x2| {
             assert_eq!(x.parent().unwrap(), test_file_name);
             Ok(test_file_content.bytes().collect())
         });
