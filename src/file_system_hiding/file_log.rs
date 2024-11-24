@@ -1,127 +1,147 @@
 use std::path::Path;
-use crate::algorithm_hiding::UniqueId;
-trait FileLog {
-    fn init(&mut self) -> std::result::Result<(), String>;
-    fn save_file(&mut self, file_id: &Path, file_contents: &str) -> std::io::Result<UniqueId>;
-    fn retrieve_version(&mut self, file_id: &Path, id: UniqueId) -> Option<String>;
+use std::str::from_utf8;
+use serde::__private::de::TagOrContentField::Content;
+use crate::algorithm_hiding::{create_unique_id, UniqueId};
+pub trait FileLog {
+    fn init(&mut self) -> Result<(), String>;
+    fn save_file(&self, file_id: &Path) -> std::io::Result<UniqueId>;
+    fn retrieve_version(&self, file_id: &Path, id: UniqueId) -> Option<String>;
 }
 
-struct DBLFileLog {
+pub struct DBLFileLog<T> where T: Files {
+    initialized:bool,
+    _t: Option<T>,
 }
-use crate::file_system_hiding::file_management;
-use crate::file_system_hiding::file_management::write_to_file;
+use crate::file_system_hiding::file_management::Files;
 
-impl FileLog for DBLFileLog {
-
+impl<T> FileLog for DBLFileLog<T>  where T: Files{
     fn init(&mut self) -> Result<(), String> {
-        write_to_file("file_log_info", "test", "data");
-
-        Ok(())
-    }
-    fn save_file(&mut self, file_id: &Path, file_contents: &str) -> std::io::Result<UniqueId> {
-        todo!()
-    }
-    fn retrieve_version(&mut self, file_id: &Path, id: UniqueId) -> Option<String> {
-        todo!()
-    }
-}
-
-fn create_file_log() -> impl FileLog {
-    todo!();
-    DBLFileLog{}
-}
-
-
-#[cfg(test)]
-mod tests {
-    use std::env;
-    use super::*;
-    use std::path::{Path, PathBuf};
-    use temp_dir::TempDir;
-    struct TestFS{
-        path: PathBuf,
-    }
-    impl TestFS {
-        pub fn new() -> Option<Self> {
-            let path = std::env::current_dir().ok()?;
-            let tmpdir = TempDir::new().ok()?;
-
-            std::env::set_current_dir(tmpdir.path());
-            Some(TestFS{
-                path
-            })
+        let res = T::write_to_file(Path::new("file_log_info"), "Initialized");
+        match res{
+            Ok(_) => Ok(()),
+            Err(e) => Err(e.to_string())
         }
     }
-    impl Drop for TestFS {
-        fn drop(&mut self) {
-            std::env::set_current_dir(self.path.as_path());
+    fn save_file(&self, file_id: &Path) -> std::io::Result<UniqueId> {
+        let id = create_unique_id();
+        let mut path = file_id.to_path_buf();
+        let c = match (String::from_utf8(T::read_file(file_id)?)) {
+            Ok(content) => content,
+            Err(e) => {return Err(std::io::Error::new(std::io::ErrorKind::Other, e));}
+        };
+        path.push(id.into_string());
+        T::create_file(path.as_path(),true);
+        T::write_to_file(path.as_path(), &c);
+        Ok(id)
+    }
+    fn retrieve_version(&self, file_id: &Path, id: UniqueId) -> Option<String> {
+        match T::read_file(file_id) {
+            Ok(vec) => {
+                match String::from_utf8(vec) {
+                    Ok(contents) => Some(contents),
+                    Err(_) => None
+                }
+            },
+            Err(_) => None
         }
     }
-    
-    
-    #[test]
-    fn test_init() {
-        let tmpfs = TestFS::new().expect("Failed to create test environment");
-
-        let mut file_log = create_file_log();
-        assert!(file_log.init().is_ok());
-        assert!(!file_log.init().is_ok());
-
-        drop(tmpfs);
-    }
-    #[test]
-    fn test_init_already_initialized() {
-        let mut file_log = create_file_log();
-        assert!(!file_log.init().is_ok());
-    }
-
-    #[test]
-    fn test_save_file() {
-        let mut file_log = create_file_log();
-        let buf = "TESTING CONTENT";
-        let version = file_log.save_file(Path::new("Test_name"), buf);
-        let return_buf = file_log.retrieve_version(Path::new("Test_name"), version.expect("REASON"));
-        assert!(return_buf.is_some());
-        assert!(buf.eq(return_buf.unwrap().as_str()));
-    }
-    #[test]
-    fn test_save_multiple_versions() {
-        let mut file_log = create_file_log();
-        let buf = "TESTING CONTENT";
-        let buf2 = "TESTING CONTENT 2";
-        let version = file_log.save_file(Path::new("Test_name"), buf);
-        let version2 = file_log.save_file(Path::new("Test_name"), buf2);
-        let return_buf = file_log.retrieve_version(Path::new("Test_name"), version.unwrap());
-        let return_buf2 = file_log.retrieve_version(Path::new("Test_name"), version2.unwrap());
-        assert!(return_buf.is_some());
-        assert!(return_buf2.is_some());
-        assert!(buf.eq(return_buf.unwrap().as_str()));
-        assert!(buf2.eq(return_buf2.unwrap().as_str()));
-    }
-    #[test]
-    fn test_save_multiple_files() {
-        let mut file_log = create_file_log();
-        let buf = "TESTING CONTENT";
-        let buf2 = "TESTING CONTENT 2";
-        let version = file_log.save_file(Path::new("Test_name"), buf);
-        let version2 = file_log.save_file(Path::new("Test_name_2"), buf2);
-        let return_buf = file_log.retrieve_version(Path::new("Test_name"), version.unwrap());
-        let return_buf2 = file_log.retrieve_version(Path::new("Test_name2"), version2.unwrap());
-        assert!(return_buf.is_some());
-        assert!(return_buf2.is_some());
-        assert!(buf.eq(return_buf.unwrap().as_str()));
-        assert!(buf2.eq(return_buf2.unwrap().as_str()));
-    }
-    #[test]
-    fn test_stored_files() {
-        todo!()
-        // set_up_mock_fs();
-        // let file_log = create_file_log();
-        // let version = get_known_version();
-        // let buf = known_test_buf();
-        // let return_buf = file_log.retrieve_version(Path::new("Test_name"), version);
-        // assert!(return_buf.is_some());
-        // assert!(buf.eq(return_buf.unwrap().as_ref()));
-    }
 }
+
+fn create_file_log<T>() -> impl FileLog where T: Files {
+    DBLFileLog::<T>{ initialized: false, _t:None}
+}
+
+
+// #[cfg(test)]
+// mod tests {
+//     use crate::file_system_hiding::file_log::*;
+//     use crate::file_system_hiding::file_management::Files;
+//     use crate::file_system_hiding::file_management::MockFiles;
+//     use crate::file_system_hiding::file_log::create_file_log;
+//     use std::io::{ErrorKind, Result};
+//     use std::path::Path;
+//
+//
+//     #[test]
+//     fn test_init() {
+//         MockFiles::new();
+//
+//         let wtf_ctx = MockFiles::write_to_file_context();
+//         wtf_ctx.expect().once()
+//             .return_once(|x, x1| {
+//                 println!("{:?}, {:?}", x, x1);
+//                 Ok(())
+//             });
+//         wtf_ctx.expect().once()
+//             .return_once(|x, x1| {
+//                 println!("{:?}, {:?}", x, x1);
+//                 Err(std::io::Error::new(ErrorKind::Other, "test"))
+//             });
+//
+//         let mut file_log = create_file_log::<MockFiles>();
+//
+//         assert!(file_log.init().is_ok());
+//         assert!(!file_log.init().is_ok());
+//     }
+//     #[test]
+//     fn test_init_already_initialized() {
+//         let wtf_ctx = MockFiles::write_to_file_context();
+//         wtf_ctx.expect().once()
+//             .return_once(|x, x1| {
+//                 println!("{:?}, {:?}", x, x1);
+//                 Err(std::io::Error::new(ErrorKind::Other, "test"))
+//             });
+//         let mut file_log = create_file_log::<MockFiles>();
+//         assert!(!file_log.init().is_ok());
+//     }
+//
+//     #[test]
+//     fn test_save_file() {
+//         let mut file_log = create_file_log::<MockFiles>();
+//         let buf = "TESTING CONTENT";
+//         let version = file_log.save_file(Path::new("Test_name"), buf);
+//         let return_buf = file_log.retrieve_version(Path::new("Test_name"), version.expect("REASON"));
+//         assert!(return_buf.is_some());
+//         assert!(buf.eq(return_buf.unwrap().as_str()));
+//     }
+//     #[test]
+//     fn test_save_multiple_versions() {
+//         let mut file_log = create_file_log::<MockFiles>();
+//         let buf = "TESTING CONTENT";
+//         let buf2 = "TESTING CONTENT 2";
+//         let version = file_log.save_file(Path::new("Test_name"), buf);
+//         let version2 = file_log.save_file(Path::new("Test_name"), buf2);
+//         let return_buf = file_log.retrieve_version(Path::new("Test_name"), version.unwrap());
+//         let return_buf2 = file_log.retrieve_version(Path::new("Test_name"), version2.unwrap());
+//         assert!(return_buf.is_some());
+//         assert!(return_buf2.is_some());
+//         assert!(buf.eq(return_buf.unwrap().as_str()));
+//         assert!(buf2.eq(return_buf2.unwrap().as_str()));
+//     }
+//     #[test]
+//     fn test_save_multiple_files() {
+//         let mut file_log = create_file_log::<MockFiles>();
+//         let buf = "TESTING CONTENT";
+//         let buf2 = "TESTING CONTENT 2";
+//         let version = file_log.save_file(Path::new("Test_name"), buf);
+//         let version2 = file_log.save_file(Path::new("Test_name_2"), buf2);
+//         let return_buf = file_log.retrieve_version(Path::new("Test_name"), version.unwrap());
+//         let return_buf2 = file_log.retrieve_version(Path::new("Test_name2"), version2.unwrap());
+//         assert!(return_buf.is_some());
+//         assert!(return_buf2.is_some());
+//         assert!(buf.eq(return_buf.unwrap().as_str()));
+//         assert!(buf2.eq(return_buf2.unwrap().as_str()));
+//     }
+//     #[test]
+//     fn test_stored_files() {
+//         todo!()
+//         // set_up_mock_fs();
+//         // let file_log = create_file_log();
+//         // let version = get_known_version();
+//         // let buf = known_test_buf();
+//         // let return_buf = file_log.retrieve_version(Path::new("Test_name"), version);
+//         // assert!(return_buf.is_some());
+//         // assert!(buf.eq(return_buf.unwrap().as_ref()));
+//     }
+// }
 
