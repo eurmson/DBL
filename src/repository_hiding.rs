@@ -1,7 +1,6 @@
 #![allow(unused)]
-use crate::algorithm_hiding;
-use crate::algorithm_hiding::UniqueId;
-use crate::file_management;
+use crate::algorithm_hiding::{UniqueId, create_unique_id};
+use crate::file_management::{Files, Directory};
 use crate::file_system_hiding::file_log;
 use file_log::FileLog;
 use std::collections::HashMap;
@@ -13,7 +12,7 @@ use std::cell::{Ref, RefCell};
 type NodePointer = Option<Rc<RefCell<RGNode>>>;
 
 trait Serializable{
-    fn serialize(&self, file_name: String, repo_name: String) -> std::result::Result<(), Error>;
+    fn serialize(&self, file_name: PathBuf) -> std::result::Result<(), Error>;
 }
 #[derive(Debug)]
 struct RGData{
@@ -47,21 +46,23 @@ struct RGNode{
     p2: NodePointer,
 }
 
-struct RevGraph{
+struct RevGraph<T> where T: Files{
     // Hashmap to keep track of revision and files associated with each
     graph: HashMap<UniqueId, NodePointer>,
     // Hashmap to keep track of nodes at the head of each branch
     heads: HashMap<String, NodePointer>,
     // Pointer to the current node of the current branch
     curr_rev: NodePointer,
+    _t: Option<T>,
 }
 
-impl RevGraph{
+impl<T> RevGraph<T> where T: Files{
     fn init() -> Self{
         let rev = RevGraph{
             graph: HashMap::new(),
             heads: HashMap::new(),
             curr_rev: None,
+            _t: None,
         };
         rev
     }
@@ -70,7 +71,8 @@ impl RevGraph{
         RevGraph{
             graph: HashMap::new(),
             heads: HashMap::new(),
-            curr_rev: None
+            curr_rev: None,
+            _t: None,
         }
     }
 
@@ -111,7 +113,7 @@ impl RevGraph{
         match &self.curr_rev{
             // TODO: Handle the error case of committing when no files are being tracked
             Some(rg_node) =>{
-                let mut fl = file_log::create_file_log::<file_management::Directory>();
+                let mut fl = file_log::create_file_log::<Directory>();
                 // Save snapshots of files being tracked
                 // Add file_id (path) and uniqueID to the commit map for given revision
                 (*rg_node).borrow_mut()
@@ -135,7 +137,7 @@ impl RevGraph{
                     p1: Some(Rc::clone(rg_node)),
                     p2: None,
                 }));
-                let id = algorithm_hiding::create_unique_id();
+                let id = create_unique_id();
                 self.graph.insert(id, Some(Rc::clone(rg_node)));
                 self.curr_rev = Some(new_node);
                 self.point_head(branch_name);
@@ -160,11 +162,11 @@ impl RevGraph{
     } 
 }
 
-impl Serializable for RevGraph{
-    fn serialize(&self, file_name: String, repo_name: String) -> std::result::Result<(), Error>{
+impl<T> Serializable for RevGraph<T> where T: Files{
+    fn serialize(&self, file_name: PathBuf) -> std::result::Result<(), Error>{
         let rg_str = "{}".to_string();
         if self.graph.is_empty(){
-            if let Err(e) = file_management::write_to_file(&file_name, &repo_name, &rg_str){
+            if let Err(e) = T::write_to_file(&file_name, &rg_str){
                 eprintln!("Failed to create/write to file: {}", e);
             }
         }
@@ -172,16 +174,16 @@ impl Serializable for RevGraph{
     }
 }
 
-pub fn action_handler(command: String, repo_name: String, file_names: Vec<PathBuf>, branch_name: String, rev_id: UniqueId) -> std::result::Result<String, String>{
-    let file_name = "rg_info.json".to_string();
+pub fn action_handler<T: Files>(command: String, repo_name: String, file_names: Vec<PathBuf>, branch_name: String, rev_id: UniqueId) -> std::result::Result<String, String>{
+    let file_name = PathBuf::from("rg_info.json");
     let mut init_res = String::from("initialized");
-    let mut rg: RevGraph;
+    let mut rg: RevGraph<T>;
     rg = RevGraph::init();
 
     // TODO: Combine init and reinit code (if rg_info has init info then reinit else init afresh)
     if command == "init"{
         // Serialize is called before exiting after completing command
-        RevGraph::serialize(&rg, file_name, repo_name);
+        RevGraph::serialize(&rg, file_name);
         return Ok(init_res)
     }
     
@@ -199,7 +201,7 @@ pub fn action_handler(command: String, repo_name: String, file_names: Vec<PathBu
 
     }
     if command == "cat"{
-        let mut fl = file_log::create_file_log::<file_management::Directory>();
+        let mut fl = file_log::create_file_log::<Directory>();
         let &file_id = rg.graph.get(&rev_id).unwrap().as_ref().unwrap().borrow_mut().data.commit_map.get(&file_names[0]).unwrap();
         if let Some(file_content) = fl.retrieve_version(file_names[0].as_path(), file_id) {
             return Ok(file_content);
