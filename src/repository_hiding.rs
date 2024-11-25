@@ -42,6 +42,24 @@ impl RGData{
         let temp_list: Vec<&PathBuf> = self.track_list.iter().filter(|&fname_1| !file_names.contains(fname_1)).collect();
         self.track_list = temp_list.iter().map(|&fname| fname.clone()).collect();
     }
+    fn add_commits(&mut self){
+        // println!("Called");
+        println!("track list: {:?}", self.track_list);
+        self.track_list.iter().for_each(|fname| {
+            let mut fl = file_log::create_file_log::<Directory>();
+            let res = fl.save_file(fname.clone().as_path());
+            println!("conv unique id: {:?}", res);
+            match res{
+                Ok(id) => {
+                    println!("conv unique id: {:?}", id);
+                    self.commit_map.insert(fname.clone(), id);
+                }
+                Err(e) => {
+                    // println!("The file was not converted to uniqueID");
+                }
+            }
+        });
+    }
 }
 
 // TODO: Think about whether data should be an Option or when data needs to be empty you should just have an empty vector?
@@ -116,31 +134,17 @@ impl<T> RevGraph<T> where T: Files{
         }
     }
     // TODO: This function should return result
-    fn add_graph_node(& mut self){
+    fn add_graph_node(& mut self) -> Result<UniqueId, String>{
         match &self.curr_rev{
             // TODO: Handle the error case of committing when no files are being tracked
             Some(rg_node) =>{
                 let mut fl = file_log::create_file_log::<Directory>();
-                // Save snapshots of files being tracked
-                // Add file_id (path) and uniqueID to the commit map for given revision
-                (*rg_node).borrow_mut()
-                            .data.track_list
-                            .iter()
-                            .for_each(|fname|
-                                {let res = fl.save_file(fname.clone().as_path());
-                                 match res{
-                                    Ok(id) => {
-                                        (*rg_node).borrow_mut().data.commit_map.insert(fname.clone(), id);
-                                    }, 
-                                    // TODO: handle error case properly
-                                    Err(e) => (),
-                                    }
-                                });
+                (*rg_node).borrow_mut().data.add_commits();
                 // Create a new node tracking same files as current revision
                 // Set one of the parents to the current revision and stash away the curr rev
                 // Set curr rev to the new node
                 let new_node = Rc::new(RefCell::new(RGNode{
-                    data: RGData::new(rg_node.borrow_mut().data.track_list.clone(), HashMap::new()),
+                    data: RGData::new(rg_node.borrow().data.track_list.clone(), HashMap::new()),
                     id: None,
                     p1: Some(Rc::clone(rg_node)),
                     p2: None,
@@ -149,9 +153,10 @@ impl<T> RevGraph<T> where T: Files{
                 self.graph.insert(id, Some(Rc::clone(rg_node)));
                 self.curr_rev = Some(new_node);
                 self.point_head(DEFAULT_BRANCH_NAME.to_string());
+                Ok(id)
             }
             _ => {
-                todo!("add_graph_node")
+                Err("No Files Currently Being Tracked".to_string())
                 // TODO: Handle the error case of committing before the node even exists
             }
         }
@@ -290,6 +295,16 @@ impl<T> RevGraph<T> where T: Files{
                 p2: parents.1,
             }))));
 
+            match self.heads.get(&DEFAULT_BRANCH_NAME.to_string()).unwrap().clone(){
+                Some(rg_node) =>{
+                    self.curr_rev = Some(rg_node);
+                }
+                // TODO: Handle the Error case of trying to point head to curr_rev when curr_rev is uninitialized
+                // Realistically, this case should not even arise
+                _ => {
+    
+                }
+            }
     });
     }
 }
@@ -317,14 +332,22 @@ pub fn action_handler<T: Files>(command: String, file_names: Option<Vec<PathBuf>
     let mut init_res = String::from("initialized");
     let mut rg: RevGraph<T>;
     rg = RevGraph::init();
-    println!("Before:\n{:?}\n, {:?}\n, {:?}\n", rg.graph, rg.heads, rg.curr_rev);
-    let init_data = String::from_utf8(T::read_file(&rev_graph_info_file, true).unwrap()).unwrap();
-    rg.reinit(init_data);
+    // println!("Before:\n{:?}\n, {:?}\n, {:?}\n", rg.graph, rg.heads, rg.curr_rev);
+    match T::read_file(&rev_graph_info_file, true) {
+        Ok(x) if x != "{}".bytes().collect::<Vec<u8>>() => {
+            
+            rg.reinit(String::from_utf8(x).unwrap());}
+        _ => {
+            rg.serialize(rev_graph_info_file.clone());
+        }
+    }
+    
+   
     // if init_data != "{}" {
     //     println!("AAAA");
     //
     // }
-    println!("After:\n{:?}\n, {:?}\n, {:?}\n", rg.graph, rg.heads, rg.curr_rev);
+    // println!("After:\n{:?}\n, {:?}\n, {:?}\n", rg.graph, rg.heads, rg.curr_rev);
     rg.serialize(rev_graph_info_file.clone());
 
     let branch_name = branch_name.unwrap_or_else(|| DEFAULT_BRANCH_NAME.to_string());
@@ -343,7 +366,7 @@ pub fn action_handler<T: Files>(command: String, file_names: Option<Vec<PathBuf>
                 Some(file_names) => {
                     println!("{:?}", file_names);
                     rg.add_files(file_names.clone());
-                    println!("{:?}\n, {:?}\n, {:?}\n", rg.graph, rg.heads, rg.curr_rev);
+                    // println!("{:?}\n, {:?}\n, {:?}\n", rg.graph, rg.heads, rg.curr_rev);
                     Ok("Added files to repo".to_string())
                 }
                 None => {
@@ -364,20 +387,33 @@ pub fn action_handler<T: Files>(command: String, file_names: Option<Vec<PathBuf>
             }
         }
         "commit" => {
-            println!("{:?}", rg.graph);
-            println!("{:?}", rg.curr_rev);
-            rg.add_graph_node();
-            println!("{:?}", rg.curr_rev);
-            println!("{:?}", rg.graph);
-            Ok("Commited Files".to_string())
+            // println!("{:?}", rg.graph);
+            // println!("{:?}", rg.curr_rev);
+            match rg.add_graph_node(){
+                    Ok(id) => {Ok(id.into_string())}
+                    Err(msg) => {Err(msg)}
+            }
+            // println!("{:?}", rg.curr_rev);
+            // println!("{:?}", rg.graph);
+            // Ok("Commited Files".to_string())
         }
         "status" => {
-            todo!()
+            let t_list = rg.curr_rev.clone().unwrap().borrow_mut().data.track_list.clone();
+            let res = serde_json::to_string(&t_list);
+            match res{
+                Ok(msg) => {Ok(msg)}
+                Err(e) => {Err("something went wrong".to_string())}
+            }
+            // Ok("".to_string())
+            // todo!()
         }
         "cat" => {
             let mut fl = file_log::create_file_log::<Directory>();
             match (rev_id.get(0).take().unwrap_or(&None), file_names) {
                 (Some(rev_id), Some(file_names)) => {
+                    println!("{:?}", rg.graph);
+                    println!("{:?}", rev_id);
+                    println!("file: {:?}", file_names[0]);
                     let &file_id = rg.graph.get(&rev_id).unwrap().as_ref().unwrap().borrow_mut().data.commit_map.get(&file_names[0]).unwrap();
                     if let Some(file_content) = fl.retrieve_version(file_names[0].as_path(), file_id) {
                         Ok(file_content)
@@ -389,6 +425,21 @@ pub fn action_handler<T: Files>(command: String, file_names: Option<Vec<PathBuf>
                 (None, Some(_)) => Err(String::from("Missing file name")),
                 _ => Err(String::from("Missing file_id and revision_id"))
             }
+        }
+        "log" => {
+            let rev = rev_id[0].unwrap();
+            let rg_node_op = rg.graph.get(&rev);
+            // let mut msg = "".to_string();
+            let msg: String = match rg_node_op{
+                Some(op) => {
+                    let rg_node = op.clone().unwrap();
+                    let res = serde_json::to_string(&rg_node.borrow_mut().data.track_list);
+                    "".to_string()
+                }
+                None => {"No such revision ID".to_string()}
+            };
+            Ok(msg)
+            // Ok("".to_string())
         }
         _ => {Err("Unsupported command".to_string())}
     };
