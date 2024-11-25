@@ -38,7 +38,6 @@ fn main() {
                 eprintln!("Usage: {} {} <file_names>", args[0], command);
                 process::exit(1);
             }
-            println!("{:?}", &args[3..args.len()]);
             let file_names: Vec<PathBuf> = args[2..args.len()].iter().map(|a|PathBuf::from(a)).collect();
             match repository_hiding::action_handler::<Directory>(command.to_string(), Some(file_names), None, vec![]) {
                 Ok(result) => println!("{}", result),
