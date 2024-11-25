@@ -36,7 +36,8 @@ fn main() {
                 eprintln!("Usage: {} {} <repository_name> <file_names> [branch_name]", args[0], command);
                 process::exit(1);
             }
-            let file_names: Vec<PathBuf> = args[3..args.len() - 1].iter().map(|a|PathBuf::from(a)).collect();
+            println!("{:?}", &args[3..args.len()]);
+            let file_names: Vec<PathBuf> = args[3..args.len()].iter().map(|a|PathBuf::from(a)).collect();
             let branch_name = args[args.len() - 1].clone();
             match repository_hiding::action_handler::<Directory>(command.to_string(), Some(file_names), Some(branch_name), vec![]) {
                 Ok(result) => println!("{}", result),
