@@ -136,8 +136,6 @@ mod tests {
     #[test]
     fn test_create_unique_id() {
         let uid1 = create_unique_id();
-        print!("{}" ,uid1.into_string());
-        print!("{:?}" , UniqueId::from_string(&uid1.into_string()));
         let uid2 = create_unique_id();
         assert_ne!(uid1, uid2);
     }
