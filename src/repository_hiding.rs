@@ -9,6 +9,9 @@ use serde_json::{json, Value, Error};
 use std::rc::Rc;
 use std::cell::{Ref, RefCell};
 
+const DEFAULT_BRANCH_NAME:&str = "main";
+
+
 type NodePointer = Option<Rc<RefCell<RGNode>>>;
 
 trait Serializable{
@@ -78,7 +81,7 @@ impl<T> RevGraph<T> where T: Files{
     }
 
     // TODO: This function should return result
-    fn add_files(& mut self, file_names: Vec<PathBuf>, branch_name: String){
+    fn add_files(& mut self, file_names: Vec<PathBuf>){
         match &self.curr_rev{
             Some(rg_node) => {
                 // TODO: Handle the case of trying to add files that are already being tracked (error or just a message?)
@@ -92,7 +95,7 @@ impl<T> RevGraph<T> where T: Files{
                     p2: None,
                 }));
                 self.curr_rev = Some(rg_node);
-                self.point_head(branch_name);
+                self.point_head(DEFAULT_BRANCH_NAME.to_string());
             }
         }
     }
@@ -111,7 +114,7 @@ impl<T> RevGraph<T> where T: Files{
         }
     }
     // TODO: This function should return result
-    fn add_graph_node(& mut self, branch_name: String){
+    fn add_graph_node(& mut self){
         match &self.curr_rev{
             // TODO: Handle the error case of committing when no files are being tracked
             Some(rg_node) =>{
@@ -143,7 +146,7 @@ impl<T> RevGraph<T> where T: Files{
                 let id = create_unique_id();
                 self.graph.insert(id, Some(Rc::clone(rg_node)));
                 self.curr_rev = Some(new_node);
-                self.point_head(branch_name);
+                self.point_head(DEFAULT_BRANCH_NAME.to_string());
             }
             _ => {
                 // TODO: Handle the error case of committing before the node even exists
@@ -177,40 +180,70 @@ impl<T> Serializable for RevGraph<T> where T: Files{
     }
 }
 
-pub fn action_handler<T: Files>(command: String, repo_name: String, file_names: Vec<PathBuf>, branch_name: String, rev_id: UniqueId) -> std::result::Result<String, String>{
-    let file_name = PathBuf::from("rg_info.json");
+pub fn action_handler<T: Files>(command: String, file_names: Option<Vec<PathBuf>>, branch_name: Option<String>, rev_id: Vec<Option<UniqueId>>) -> Result<String, String>{
+    let rev_graph_info_file = PathBuf::from("rg_info.json");
     let mut init_res = String::from("initialized");
     let mut rg: RevGraph<T>;
     rg = RevGraph::init();
-
-    // TODO: Combine init and reinit code (if rg_info has init info then reinit else init afresh)
-    if command == "init"{
-        // Serialize is called before exiting after completing command
-        RevGraph::serialize(&rg, file_name);
-        return Ok(init_res)
-    }
-    
-    if command == "add"{
-        // TODO: DECIDE IF THE CURR-REV SHOULD BE INITIALIZED WHEN THE GRAPH IS INITIALIZED OR WHEN ADD IS CALLED FOR THE FIRST TIME
-        rg.add_files(file_names.clone(), branch_name.clone());
-    }
-    if command == "remove"{
-        rg.remove_files(file_names.clone());
-    }
-    if command == "commit"{
-        rg.add_graph_node(branch_name.clone());
-    }
-    if command == "status"{
-
-    }
-    if command == "cat"{
-        let mut fl = file_log::create_file_log::<Directory>();
-        let &file_id = rg.graph.get(&rev_id).unwrap().as_ref().unwrap().borrow_mut().data.commit_map.get(&file_names[0]).unwrap();
-        if let Some(file_content) = fl.retrieve_version(file_names[0].as_path(), file_id) {
-            return Ok(file_content);
-        };
-    }
+    let branch_name = branch_name.unwrap_or_else(|| DEFAULT_BRANCH_NAME.to_string());
 
 
-    Err(String::from("failed"))
+    match command.as_str() {
+        "init" => {
+            // TODO: Combine init and reinit code (if rg_info has init info then reinit else init afresh)
+            // Serialize is called before exiting after completing command
+            RevGraph::serialize(&rg, rev_graph_info_file);
+            Ok(init_res)
+        }
+        "add" => {
+            // TODO: DECIDE IF THE CURR-REV SHOULD BE INITIALIZED WHEN THE GRAPH IS INITIALIZED OR WHEN ADD IS CALLED FOR THE FIRST TIME
+            match file_names {
+                Some(file_names) => {
+                    rg.add_files(file_names.clone());
+                    Ok("Added files to repo".to_string())
+                }
+                None => {
+                    Err(String::from("Missing File names to add"))
+                }
+            }
+        }
+        "remove" => {
+            match file_names {
+                Some(file_names) => {
+                    rg.remove_files(file_names.clone());
+                    Ok("Stopped tracking files".to_string())
+                }
+                None => {
+                    Err(String::from("Missing File names to remove"))
+                }
+            }
+        }
+        "commit" => {
+            rg.add_graph_node();
+            Ok("Commited Files".to_string())
+        }
+        "status" => {
+            todo!()
+        }
+        "cat" => {
+            let mut fl = file_log::create_file_log::<Directory>();
+            match (rev_id.get(0).take().unwrap_or(&None), file_names) {
+                (Some(rev_id),Some(file_names))  => {
+                    let &file_id = rg.graph.get(&rev_id).unwrap().as_ref().unwrap().borrow_mut().data.commit_map.get(&file_names[0]).unwrap();
+                    if let Some(file_content) = fl.retrieve_version(file_names[0].as_path(), file_id) {
+                        Ok(file_content)
+                    } else {
+                        Err("Could not get file version".to_string())
+                    }
+                }
+                (Some(_), None) => Err(String::from("Missing revision ID")),
+                (None, Some(_)) => Err(String::from("Missing file name")),
+                _ => Err(String::from("Missing file_id and revision_id"))
+            }
+
+        }
+
+
+        _ => {Err("Unsupported command".to_string())}
+    }
 }

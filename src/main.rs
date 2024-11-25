@@ -6,8 +6,11 @@ mod algorithm_hiding;
 
 use std::env;
 use std::process;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::vec::Drain;
+use crate::algorithm_hiding::UniqueId;
 use crate::file_system_hiding::file_management;
+use crate::file_system_hiding::file_management::{Directory, Files};
 
 fn main() {
     // Parse command line arguments
@@ -33,9 +36,9 @@ fn main() {
                 eprintln!("Usage: {} {} <repository_name> <file_names> [branch_name]", args[0], command);
                 process::exit(1);
             }
-            let file_names: Vec<String> = args[3..args.len() - 1].to_vec();
+            let file_names: Vec<PathBuf> = args[3..args.len() - 1].iter().map(|a|PathBuf::from(a)).collect();
             let branch_name = args[args.len() - 1].clone();
-            match repository_hiding::action_handler(command.to_string(), repo_name.to_string(), file_names, branch_name, String::new()) {
+            match repository_hiding::action_handler::<Directory>(command.to_string(), Some(file_names), Some(branch_name), vec![]) {
                 Ok(result) => println!("{}", result),
                 Err(e) => {
                     eprintln!("Error in action handler: {}", e);
@@ -58,13 +61,13 @@ fn handle_init_command(args: &[String], repo_name: &str) {
     }
 
     // Initialize an empty repository
-    if let Err(e) = file_management::initialize_repository(repo_name) {
+    if let Err(e) = file_management::Directory::init(repo_name.as_ref()) {
         eprintln!("Failed to initialize repository: {}", e);
         process::exit(1);
     }
 
     // Handle repository action
-    match repository_hiding::action_handler("init".to_string(), repo_name.to_string(), vec![], "".to_string(), String::new()) {
+    match repository_hiding::action_handler::<Directory>("init".to_string(), None, None, vec![]) {
         Ok(result) => println!("{}", result),
         Err(e) => {
             eprintln!("Error in action handler: {}", e);
@@ -83,9 +86,9 @@ fn handle_status_command(args: &[String], repo_name: &str) {
     }
 
     let branch_name = args[3].clone();
-    let rev_id = if args.len() > 4 { args[4].clone() } else { String::new() };
+    let rev_id = if args.len() > 4 { Some(UniqueId::from_string(&args[4])).flatten() } else { None };
 
-    match repository_hiding::action_handler("status".to_string(), repo_name.to_string(), vec![], branch_name, rev_id) {
+    match repository_hiding::action_handler::<Directory>("status".to_string(), None, None, vec![rev_id]) {
         Ok(result) => println!("{}", result),
         Err(e) => {
             eprintln!("Error in action handler: {}", e);
@@ -101,10 +104,10 @@ fn handle_cat_command(args: &[String], repo_name: &str) {
         process::exit(1);
     }
 
-    let file_names: Vec<String> = args[3..args.len() - 1].to_vec();
-    let rev_id = if args.len() > 4 { args[args.len() - 1].clone() } else { String::new() };
+    let file_names: Vec<PathBuf> = args[3..args.len() - 1].iter().map(|a|PathBuf::from(a)).collect();
+    let rev_id = if args.len() > 4 { Some(UniqueId::from_string(&args[4])).flatten() } else { None };
 
-    match repository_hiding::action_handler("cat".to_string(), repo_name.to_string(), file_names, "".to_string(), rev_id) {
+    match repository_hiding::action_handler::<Directory>("cat".to_string(), Some(file_names), None, vec![rev_id]) {
         Ok(result) => println!("{}", result),
         Err(e) => {
             eprintln!("Error in action handler: {}", e);
@@ -121,10 +124,10 @@ fn handle_diff_command(args: &[String], repo_name: &str) {
     }
 
     let file_name = &args[3];
-    let rev_id1 = &args[4];
-    let rev_id2 = &args[5];
+    let rev_id1 = UniqueId::from_string(&args[4]);
+    let rev_id2 = UniqueId::from_string(&args[5]);
 
-    match repository_hiding::action_handler("diff".to_string(), repo_name.to_string(), vec![file_name.clone()], rev_id1.clone(), rev_id2.clone()) {
+    match repository_hiding::action_handler::<Directory>("diff".to_string(), Some(vec![PathBuf::from(file_name.clone())]), None, vec![rev_id1.clone(), rev_id2.clone()]) {
         Ok(result) => println!("{}", result),
         Err(e) => {
             eprintln!("Error in action handler: {}", e);
@@ -140,11 +143,11 @@ fn handle_merge_command(args: &[String], repo_name: &str) {
         process::exit(1);
     }
 
-    let file_name = &args[3];
-    let rev_id1 = &args[4];
-    let rev_id2 = &args[5];
+    let file_name = PathBuf::from(&args[3]);
+    let rev_id1 = UniqueId::from_string(&args[4]);
+    let rev_id2 = UniqueId::from_string(&args[5]);
 
-    match repository_hiding::action_handler("merge".to_string(), repo_name.to_string(), vec![file_name.clone()], rev_id1.clone(), rev_id2.clone()) {
+    match repository_hiding::action_handler::<Directory>("merge".to_string(), Some(vec![file_name.clone()]), None, vec![rev_id1.clone(), rev_id2.clone()]) {
         Ok(result) => println!("{}", result),
         Err(e) => {
             eprintln!("Error in action handler: {}", e);
