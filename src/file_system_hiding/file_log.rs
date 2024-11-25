@@ -55,15 +55,19 @@ pub fn create_file_log<T>() -> impl FileLog where T: Files {
 }
 
 
-
 #[cfg(test)]
 mod tests {
+
+    use std::cell::RefCell;
+    use std::collections::HashMap;
     use crate::file_system_hiding::file_log::*;
     use crate::file_system_hiding::file_management::Files;
     use crate::file_system_hiding::file_log::create_file_log;
     use std::io::{ErrorKind, Result};
     use std::path::Path;
+    use std::rc::Rc;
     use mockall::{automock, mock};
+    use serial_test::serial;
     use crate::file_system_hiding::file_management;
 
     struct Directory{}
@@ -80,17 +84,16 @@ mod tests {
 
 
     #[test]
+    #[serial]
     fn test_init() {
         create_file_log::<file_management::Directory>();
         let wtf_ctx = MockDirectory::write_to_file_context();
         wtf_ctx.expect().once()
             .return_once(|x, x1, x2| {
-                println!("{:?}, {:?}", x, x1);
                 Ok(())
             });
         wtf_ctx.expect().once()
             .return_once(|x, x1, x2| {
-                println!("{:?}, {:?}", x, x1);
                 Err(std::io::Error::new(ErrorKind::Other, "test"))
             });
 
@@ -100,18 +103,19 @@ mod tests {
         assert!(!file_log.init().is_ok());
     }
     #[test]
+    #[serial]
     fn test_init_already_initialized() {
         let wtf_ctx = MockDirectory::write_to_file_context();
         wtf_ctx.expect().once()
             .return_once(|x, x1, x2| {
-                println!("{:?}, {:?}", x, x1);
-                Err(std::io::Error::new(ErrorKind::Other, "test"))
+                                Err(std::io::Error::new(ErrorKind::Other, "test"))
             });
         let mut file_log = create_file_log::<MockDirectory>();
         assert!(!file_log.init().is_ok());
     }
 
     #[test]
+    #[serial]
     fn test_save_file() {
         let test_file_name: &Path = Path::new("Test_name");
         let test_file_content: &str = "TESTING CONTENT";
@@ -122,6 +126,7 @@ mod tests {
 
         rf_ctx.expect().once().return_once(move |x, x1| {
             assert_eq!(x, test_file_name);
+            assert!(!x1);
             Ok(test_file_content.bytes().collect())
         });
         cf_ctx.expect().once().return_once(move |x, x1| {
@@ -148,43 +153,147 @@ mod tests {
         assert!(buf.eq(return_buf.unwrap().as_str()));
     }
     #[test]
+    #[serial]
     fn test_save_multiple_versions() {
-        let mut file_log = create_file_log::<MockDirectory>();
         let buf = "TESTING CONTENT";
         let buf2 = "TESTING CONTENT 2";
+
+        let mut hashmap = Rc::new(RefCell::new(HashMap::<String, String>::new()));
+        let mut b = hashmap.clone();
+        let mut c = hashmap.clone();
+
+        let rf_ctx = MockDirectory::read_file_context();
+        let cf_ctx = MockDirectory::create_file_context();
+        let wtf_ctx = MockDirectory::write_to_file_context();
+
+        rf_ctx.expect().once().return_once(
+            move |x, x1| {
+                assert!(!x1);
+                Ok(buf.as_bytes().to_vec())
+            }
+        );
+        rf_ctx.expect().once().return_once(
+            move |x, x1| {
+                assert!(!x1);
+                Ok(buf2.as_bytes().to_vec())
+            }
+        );
+        cf_ctx.expect().times(2).returning_st(
+            |x, x1| {
+                assert!(x1);
+                Ok(())
+            }
+        );
+        wtf_ctx.expect().times(2).returning_st(
+             move |x, x1, x2| {
+                assert!(x2);
+                 b.borrow_mut().insert(x.to_path_buf().to_str().unwrap().to_string(), x1.to_string());
+                 Ok(())
+            }
+        );
+        rf_ctx.expect().times(2).returning_st( move |x, x1| {
+            assert!(x1);
+                        Ok(c.borrow_mut().get(&x.to_path_buf().to_str().unwrap().to_string()).unwrap().as_bytes().to_vec())
+        });
+
+        let mut file_log = create_file_log::<MockDirectory>();
+
         let version = file_log.save_file(Path::new("Test_name"));
         let version2 = file_log.save_file(Path::new("Test_name"));
         let return_buf = file_log.retrieve_version(Path::new("Test_name"), version.unwrap());
         let return_buf2 = file_log.retrieve_version(Path::new("Test_name"), version2.unwrap());
-        assert!(return_buf.is_some());
+                        assert!(return_buf.is_some());
         assert!(return_buf2.is_some());
         assert!(buf.eq(return_buf.unwrap().as_str()));
         assert!(buf2.eq(return_buf2.unwrap().as_str()));
     }
     #[test]
+    #[serial]
     fn test_save_multiple_files() {
-        let mut file_log = create_file_log::<MockDirectory>();
         let buf = "TESTING CONTENT";
         let buf2 = "TESTING CONTENT 2";
+
+        let mut hashmap = Rc::new(RefCell::new(HashMap::<String, String>::new()));
+        let mut b = hashmap.clone();
+        let mut c = hashmap.clone();
+
+        let rf_ctx = MockDirectory::read_file_context();
+        let cf_ctx = MockDirectory::create_file_context();
+        let wtf_ctx = MockDirectory::write_to_file_context();
+
+        rf_ctx.expect().once().return_once(
+            move |x, x1| {
+                assert!(!x1);
+                Ok(buf.as_bytes().to_vec())
+            }
+        );
+        rf_ctx.expect().once().return_once(
+            move |x, x1| {
+                assert!(!x1);
+                Ok(buf2.as_bytes().to_vec())
+            }
+        );
+        cf_ctx.expect().times(2).returning_st(
+            |x, x1| {
+                assert!(x1);
+                Ok(())
+            }
+        );
+        wtf_ctx.expect().times(2).returning_st(
+            move |x, x1, x2| {
+                assert!(x2);
+                b.borrow_mut().insert(x.to_path_buf().to_str().unwrap().to_string(), x1.to_string());
+                Ok(())
+            }
+        );
+        rf_ctx.expect().times(2).returning_st( move |x, x1| {
+            assert!(x1);
+                Ok(c.borrow_mut().get(&x.to_path_buf().to_str().unwrap().to_string()).unwrap().as_bytes().to_vec())
+        });
+
+        let mut file_log = create_file_log::<MockDirectory>();
+
         let version = file_log.save_file(Path::new("Test_name"));
-        let version2 = file_log.save_file(Path::new("Test_name_2"));
+        let version2 = file_log.save_file(Path::new("Test_name2"));
         let return_buf = file_log.retrieve_version(Path::new("Test_name"), version.unwrap());
         let return_buf2 = file_log.retrieve_version(Path::new("Test_name2"), version2.unwrap());
-        assert!(return_buf.is_some());
+                        assert!(return_buf.is_some());
         assert!(return_buf2.is_some());
         assert!(buf.eq(return_buf.unwrap().as_str()));
         assert!(buf2.eq(return_buf2.unwrap().as_str()));
     }
     #[test]
+    #[serial]
     fn test_stored_files() {
-        todo!()
-        // set_up_mock_fs();
-        // let file_log = create_file_log();
-        // let version = get_known_version();
+        let buf = "TESTING CONTENT";
+        let a = create_unique_id();
+        let id = a.into_string();
+        let path_name = Path::new("testing");
+
+        let mut hashmap = Rc::new(RefCell::new(HashMap::<String, String>::new()));
+        let mut b = hashmap.clone();
+        let mut c = hashmap.clone();
+
+        let rf_ctx = MockDirectory::read_file_context();
+        let cf_ctx = MockDirectory::create_file_context();
+        let wtf_ctx = MockDirectory::write_to_file_context();
+
+        rf_ctx.expect().once().return_once(
+            move |x, x1| {
+                let mut path = path_name.to_path_buf().clone();
+                path.push(id);
+                assert_eq!(path.as_os_str(), x);
+                assert!(x1);
+                Ok(buf.as_bytes().to_vec())
+            }
+        );
+
+        let file_log = create_file_log::<MockDirectory>();
+
         // let buf = known_test_buf();
-        // let return_buf = file_log.retrieve_version(Path::new("Test_name"), version);
-        // assert!(return_buf.is_some());
-        // assert!(buf.eq(return_buf.unwrap().as_ref()));
+        let return_buf = file_log.retrieve_version(path_name, a);
+        assert!(return_buf.is_some());
+        assert_eq!(return_buf.unwrap().as_str(), buf);
     }
 }
 
