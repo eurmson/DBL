@@ -11,7 +11,16 @@ pub struct UniqueId {
 
 impl UniqueId {
     pub fn into_string(self) -> String {
-        self.bytes.iter().map(|&b| format!("{:x}", b)).collect::<String>()
+        self.bytes.iter().map(|&b| format!("{:0^2x}", b)).collect::<String>()
+    }
+    pub fn from_string(val: &str) -> Option<Self> {
+        Some(UniqueId{
+            bytes: match u128::from_str_radix(val, 16) {
+                Ok(x) => {x.to_be_bytes()}
+                Err(e) => return None
+            }
+        })
+
     }
 }
 
@@ -122,11 +131,13 @@ pub fn merge_file_versions(file_contents1: &str, file_contents2: &str) -> Result
 }
 #[cfg(test)]
 mod tests {
-
+    use uuid::Uuid;
     use crate::algorithm_hiding::*;
     #[test]
     fn test_create_unique_id() {
         let uid1 = create_unique_id();
+        print!("{}" ,uid1.into_string());
+        print!("{:?}" , UniqueId::from_string(&uid1.into_string()));
         let uid2 = create_unique_id();
         assert_ne!(uid1, uid2);
     }
