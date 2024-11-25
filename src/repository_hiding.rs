@@ -1,9 +1,12 @@
 #![allow(unused)]
 use crate::algorithm_hiding::{UniqueId, create_unique_id};
+use crate::file_management;
 use crate::file_management::{Files, Directory};
 use crate::file_system_hiding::file_log;
 use file_log::FileLog;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::hash::Hash;
 use std::path::{Path, PathBuf};
 use serde_json::{json, Value, Error};
 use std::rc::Rc;
@@ -12,9 +15,9 @@ use std::cell::{Ref, RefCell};
 type NodePointer = Option<Rc<RefCell<RGNode>>>;
 
 trait Serializable{
-    fn serialize(&self, file_name: PathBuf) -> std::result::Result<(), Error>;
+    fn serialize(& mut self, file_name: PathBuf) -> std::result::Result<(), Error>;
 }
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 struct RGData{
     // A list of file names tracked for given revision. Addition/removal of files from tracking list affects this
     track_list: Vec<PathBuf>,
@@ -23,10 +26,10 @@ struct RGData{
 }
 
 impl RGData{
-    fn new(file_names: Vec<PathBuf>) -> Self{
+    fn new(file_names: Vec<PathBuf>, commit_map: HashMap<PathBuf, UniqueId>) -> Self{
         RGData{
             track_list: file_names,
-            commit_map: HashMap::new(),
+            commit_map: commit_map,
         }
     }
     fn add_files(&mut self, file_names: Vec<PathBuf>){
@@ -68,13 +71,10 @@ impl<T> RevGraph<T> where T: Files{
         rev
     }
     // TODO: update to reinitialize rev graph from info stored in hidden dir
-    fn reinit(data: &str) -> Self{
-        RevGraph{
-            graph: HashMap::new(),
-            heads: HashMap::new(),
-            curr_rev: None,
-            _t: None,
-        }
+    fn reinit(& mut self, rg_str: String) -> std::result::Result<(), Error>{
+        let v: (Vec<(UniqueId, RGData)>, Vec<(Option<UniqueId>, Option<UniqueId>)>, HashMap<String, (RGData, Option<UniqueId>, Option<UniqueId>)>) = serde_json::from_str(&rg_str)?;
+        self.reconstruct_rev_graph(v);
+        Ok(())
     }
 
     // TODO: This function should return result
@@ -86,7 +86,7 @@ impl<T> RevGraph<T> where T: Files{
             }
             _ => {
                 let mut rg_node = Rc::new(RefCell::new(RGNode{
-                    data: RGData::new(file_names),
+                    data: RGData::new(file_names, HashMap::new()),
                     id: None,
                     p1: None,
                     p2: None,
@@ -135,7 +135,7 @@ impl<T> RevGraph<T> where T: Files{
                 // Set one of the parents to the current revision and stash away the curr rev
                 // Set curr rev to the new node
                 let new_node = Rc::new(RefCell::new(RGNode{
-                    data: RGData::new(rg_node.borrow_mut().data.track_list.clone()),
+                    data: RGData::new(rg_node.borrow_mut().data.track_list.clone(), HashMap::new()),
                     id: None,
                     p1: Some(Rc::clone(rg_node)),
                     p2: None,
@@ -162,16 +162,145 @@ impl<T> RevGraph<T> where T: Files{
 
             }
         }
+    }
+
+    fn vectorize_rev_graph(&self) -> (Vec<(UniqueId, RGData)>, Vec<(Option<UniqueId>, Option<UniqueId>)>, HashMap<String, (RGData, Option<UniqueId>, Option<UniqueId>)>){
+        let mut vec_rg_nodes: Vec<(UniqueId, RGData)> = Vec::new();
+        let mut vec_parents_info: Vec<(Option<UniqueId>, Option<UniqueId>)> = Vec::new();
+        self.graph.iter()
+            .for_each(|(&k,v)|
+                            if let Some(node) = v {
+                                // println!("{:?}", node);
+                                vec_rg_nodes.push((k, (*node).borrow_mut().data.clone()));
+                                let rgn = (*node).borrow_mut();
+                                let p1 = rgn.p1.clone();
+                                let p2 = rgn.p2.clone();
+                                match (p1, p2){
+                                    (Some(n1), None) => {vec_parents_info.push((n1.borrow_mut().id, None));}
+                                    (Some(n1), Some(n2)) => {vec_parents_info.push((n1.borrow_mut().id, n2.borrow_mut().id));}
+                                    (None, Some(n2)) => {vec_parents_info.push((None, n2.borrow_mut().id));}
+                                    (None, None) => {vec_parents_info.push((None, None))}
+                                }
+                                // vec_parents_info.push((rgn.p1.clone().unwrap().borrow_mut().id, rgn.p2.clone().unwrap().borrow_mut().id))
+                            });
+        
+        // String is the branch Name, RGData is the data stored in the current node of the given branch, Unique IDs of the parents
+        let mut s_heads: HashMap<String, (RGData, Option<UniqueId>, Option<UniqueId>)> = HashMap::new();
+        self.heads.iter()
+            .for_each(|(k, v)| {
+                if let Some(node) = v {
+                    let rgn = (*node).borrow_mut();
+                    let p1 = rgn.p1.clone();
+                    let p2 = rgn.p2.clone();
+                    match (p1, p2){
+                        (Some(n1), None) => {s_heads.insert(k.clone(), (rgn.data.clone(), n1.borrow_mut().id, None));}
+                        (Some(n1), Some(n2)) => {s_heads.insert(k.clone(), (rgn.data.clone(), n1.borrow_mut().id, n2.borrow_mut().id));}
+                        (None, Some(n2)) => {s_heads.insert(k.clone(), (rgn.data.clone(), None, n2.borrow_mut().id));}
+                        (None, None) => {s_heads.insert(k.clone(), (rgn.data.clone(), None, None));}
+                    }
+                    // s_heads.insert(k.clone(), (rgn.data.clone(), p1.unwrap().borrow_mut().id, p2.unwrap().borrow_mut().id));
+            // let rgn = v.clone().unwrap().borrow_mut();
+            // let res = s_heads.insert(k, (rgn.data.clone(), rgn.p1.unwrap().borrow_mut().id.unwrap(), rgn.p1.unwrap().borrow_mut().id.unwrap()))
+        }
+    });
+        // println!("heads {:?}", s_heads);
+        // println!("{:?}", vec_parents_info);
+        (vec_rg_nodes, vec_parents_info, s_heads)               
+    }
+
+    fn reconstruct_rev_graph(& mut self, recon_data: (Vec<(UniqueId, RGData)>, Vec<(Option<UniqueId>, Option<UniqueId>)>, HashMap<String, (RGData, Option<UniqueId>, Option<UniqueId>)>)) {
+        self.graph = HashMap::new();
+        let vec_rg_nodes = recon_data.0;
+        let vec_parents_info = recon_data.1;
+        let s_heads = recon_data.2;
+        let mut vec_actual_parents: Vec<(NodePointer, NodePointer)> = Vec::new();
+        vec_parents_info.iter().for_each(|(p1_id, p2_id)| { 
+            // println!("pids {:?}", (p1_id, p2_id));
+            let mut parents: (NodePointer, NodePointer) = (None, None);
+            vec_rg_nodes.iter().for_each(|(id, data)|{ 
+                // println!("id: {:?}", id);
+                match Some(id.clone()) {
+                    a if a  == *p1_id => {
+                        // println!("p1_id {:?}", p1_id);
+                        parents.0 = Some(Rc::new(RefCell::new(RGNode{
+                            data: RGData::new(data.track_list.clone(), data.commit_map.clone()),
+                            id: *p1_id,
+                            p1: None,
+                            p2: None,
+                        })));},
+                    a if a == *p2_id => {
+                        // println!("p2_id {:?}", p1_id);
+                        parents.1 = Some(Rc::new(RefCell::new(RGNode{
+                        data: RGData::new(data.track_list.clone(), data.commit_map.clone()),
+                        id: *p2_id,
+                        p1: None,
+                        p2: None,
+                    })));},
+                    _ => {},
+                }
+            });
+       vec_actual_parents.push(parents)});
+    //    println!("parents \n \n: {:?}", vec_actual_parents);
+       vec_actual_parents.reverse();
+    //    println!("parents[0]: {:?}", vec_actual_parents);
+
+       vec_rg_nodes.iter().for_each(|(id, data)|{
+                            let parents = vec_actual_parents.pop().unwrap();
+                            self.graph.insert(id.clone(), Some(Rc::new(RefCell::new(RGNode{
+                            // data: Some(RGData::new(file_names)),
+                            data: RGData::new(data.track_list.clone(), data.commit_map.clone()),
+                            id: Some(id.clone()),
+                            p1: parents.0,
+                            p2: parents.1,
+                        })))
+                    );
+                });
+
+    s_heads.iter().for_each(|(k, v)| {
+        let node_data = v.0.clone();
+        let p1_id = v.1;
+        let p2_id = v.2;
+        
+        let mut parents: (NodePointer, NodePointer) = (None, None);
+            self.graph.iter().for_each(|(rev, node)|{
+                let some_node = node.clone().unwrap();
+                // let rgn = some_node.borrow_mut(); 
+                let data = some_node.borrow_mut().data.clone();
+                // println!("id: {:?}", id);
+                match Some(rev.clone()) {
+                    a if a  == p1_id => {
+                        // println!("p1_id {:?}", p1_id);
+                        parents.0 = Some(Rc::clone(&some_node));},
+                    a if a == p2_id => {
+                        // println!("p2_id {:?}", p1_id);
+                        parents.1 = Some(Rc::clone(&some_node));},
+                    _ => {},
+                }
+            });
+            self.heads.insert(k.clone(), Some(Rc::new(RefCell::new(RGNode{
+                data: node_data,
+                id: None,
+                p1: parents.0,
+                p2: parents.1,
+            }))));
+
+    });
     } 
 }
 
 impl<T> Serializable for RevGraph<T> where T: Files{
-    fn serialize(&self, file_name: PathBuf) -> std::result::Result<(), Error>{
-        let rg_str = "{}";
+    fn serialize(& mut self, file_name: PathBuf) -> std::result::Result<(), Error>{
+        let mut rg_str = "".to_string();
         if self.graph.is_empty(){
-            if let Err(e) = T::write_to_file(&file_name, rg_str, true){
-                eprintln!("Failed to create/write to file: {}", e);
-            }
+            rg_str = "{}".to_string();
+        }
+        else{
+            let tuple = self.vectorize_rev_graph();
+            rg_str = serde_json::to_string(&tuple)?;
+        }
+        
+        if let Err(e) = T::write_to_file(&file_name, &rg_str, true){
+            eprintln!("Failed to create/write to file: {}", e);
         }
         Ok(())
     }
@@ -182,11 +311,16 @@ pub fn action_handler<T: Files>(command: String, repo_name: String, file_names: 
     let mut init_res = String::from("initialized");
     let mut rg: RevGraph<T>;
     rg = RevGraph::init();
+    
+    let init_data = String::from_utf8(T::read_file(&file_name, true).unwrap()).unwrap(); 
+    if init_data != "{}" {
+        rg.reinit(init_data);
+    } 
 
     // TODO: Combine init and reinit code (if rg_info has init info then reinit else init afresh)
     if command == "init"{
         // Serialize is called before exiting after completing command
-        RevGraph::serialize(&rg, file_name);
+        rg.serialize(file_name);
         return Ok(init_res)
     }
     
