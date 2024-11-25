@@ -4,6 +4,7 @@ use serde::__private::de::TagOrContentField::Content;
 use crate::algorithm_hiding::{create_unique_id, UniqueId};
 pub trait FileLog {
     fn init(&mut self) -> Result<(), String>;
+    fn save_file_merge(&self, file_id: &Path, file_content: &str) -> std::io::Result<UniqueId>;
     fn save_file(&self, file_id: &Path) -> std::io::Result<UniqueId>;
     fn retrieve_version(&self, file_id: &Path, id: UniqueId) -> Option<String>;
 }
@@ -21,6 +22,18 @@ impl<T> FileLog for DBLFileLog<T>  where T: Files{
             Ok(_) => Ok(()),
             Err(e) => Err(e.to_string())
         }
+    }
+    fn save_file_merge(&self, file_id: &Path, file_content: &str) -> std::io::Result<UniqueId> {
+        let id = create_unique_id();
+        let mut path = file_id.to_path_buf();
+        path.push(id.into_string());
+        // let c = match (String::from_utf8(T::read_file(file_id, false)?)) {
+        //     Ok(content) => content,
+        //     Err(e) => {return Err(std::io::Error::new(std::io::ErrorKind::Other, e));}
+        // };
+        T::create_file(path.as_path(),true);
+        T::write_to_file(path.as_path(), file_content, true);
+        Ok(id)
     }
     fn save_file(&self, file_id: &Path) -> std::io::Result<UniqueId> {
         let id = create_unique_id();
