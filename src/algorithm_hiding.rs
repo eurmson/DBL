@@ -11,7 +11,7 @@ pub struct UniqueId {
 
 impl UniqueId {
     pub fn into_string(self) -> String {
-        self.bytes.iter().map(|&b| format!("{:0^2x}", b)).collect::<String>()
+        self.bytes.iter().map(|&b| format!("{:0>2x}", b)).collect::<String>()
     }
     pub fn from_string(val: &str) -> Option<Self> {
         Some(UniqueId{
@@ -136,6 +136,8 @@ mod tests {
     #[test]
     fn test_create_unique_id() {
         let uid1 = create_unique_id();
+        let tmp = UniqueId::from_string(&*uid1.into_string()).unwrap();
+        assert_eq!(tmp.bytes, uid1.bytes);
         let uid2 = create_unique_id();
         assert_ne!(uid1, uid2);
     }
