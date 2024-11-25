@@ -564,7 +564,9 @@ pub fn action_handler<T: Files>(command: String, file_names: Option<Vec<PathBuf>
         }
         "heads" => {
             let mut temp_hm: HashMap<String, RGData> = HashMap::new();
+            // print!("{:?}", rg.heads);
             rg.heads.iter().for_each(|(k, v)| {temp_hm.insert(k.clone(), v.clone().unwrap().borrow_mut().data.clone());});
+            print!("{:?}", rg.heads.keys());
             let msg = serde_json::to_string(&temp_hm);
             match msg {
                 Ok(m) => Ok(m),
@@ -577,9 +579,11 @@ pub fn action_handler<T: Files>(command: String, file_names: Option<Vec<PathBuf>
             // Retrieve nodes associated with the two revs
             // Get the commit map from each node
             // Call diff on each pair of files from the commit map
-            // If file exists in one commit map but not in other then 
+            // If file exists in one commit map but not in other then
+            println!("{:?}", rev_id);
             let comm_op_1 = rg.graph.get(&rev_id[0].unwrap());
-            let comm_op_2 = rg.graph.get(&rev_id[0].unwrap());
+            println!("{:?}", rg.graph.keys());
+            let comm_op_2 = rg.graph.get(&rev_id[1].unwrap());
             let res = match (comm_op_1, comm_op_2){
                 (Some(comm_node_1), Some(comm_node_2)) => {
                     let comm_map_1 =  comm_node_1.clone().unwrap().borrow_mut().data.commit_map.clone();
@@ -589,7 +593,9 @@ pub fn action_handler<T: Files>(command: String, file_names: Option<Vec<PathBuf>
                             Some(id) => {
                                 let file_name = k.clone().into_os_string().into_string().unwrap();
                                 let file_1_content = fl.retrieve_version(k, v.clone()).unwrap_or("".to_string());
+                                println!("{:?}", v);
                                 let file_2_content = fl.retrieve_version(k, id.clone()).unwrap_or("".to_string());
+                                println!("{:?}", id);
                                 let diff_res = algorithm_hiding::diff_file_versions(&file_1_content, &file_2_content);
                                 msg = format!("{msg}\n{file_name}:\n{diff_res}");
                             } 
