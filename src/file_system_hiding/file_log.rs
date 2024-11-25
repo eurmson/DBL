@@ -75,11 +75,11 @@ mod tests {
     impl Files for Directory{
         fn init(repo_name: &Path) -> Result<()> {unimplemented!()}
         fn create_file(file_id: &Path, is_hidden: bool) -> Result<()> {unimplemented!()}
-        fn list_files(file_id: &Path) -> Result<()> { unimplemented!() }
+        fn list_files(file_id: &Path, is_hidden: bool, file_out: &mut Vec<String>) -> Result<()> {unimplemented!()}
         fn write_to_file(file_id: &Path, addition: &str, hidden: bool) -> Result<()> {unimplemented!()}
         fn read_file(file_id: &Path, hidden: bool) -> Result<Vec<u8>> {unimplemented!()}
         fn remove_file(file_id: &Path, hidden: bool) -> Result<()> {unimplemented!()}
-        fn copy_file(source: &Path, destination: &Path, hidden: bool) -> std::result::Result<(), &'static str> { unimplemented!() }
+        fn copy_file(source: &Path, destination: &Path, hidden: bool) -> Result<u64> { unimplemented!() }
     }
 
 
