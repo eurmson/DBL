@@ -5,10 +5,10 @@ use crate::file_system_hiding::file_log;
 use file_log::FileLog;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use serde_json::json;
-use serde_json::{Value, Error};
+use serde_json::{json, Value, Error};
 use std::rc::Rc;
 use std::cell::{Ref, RefCell};
+
 type NodePointer = Option<Rc<RefCell<RGNode>>>;
 
 trait Serializable{
@@ -42,6 +42,7 @@ impl RGData{
 #[derive(Debug)]
 struct RGNode{
     data: RGData,
+    id: Option<UniqueId>,
     p1: NodePointer,
     p2: NodePointer,
 }
@@ -86,6 +87,7 @@ impl<T> RevGraph<T> where T: Files{
             _ => {
                 let mut rg_node = Rc::new(RefCell::new(RGNode{
                     data: RGData::new(file_names),
+                    id: None,
                     p1: None,
                     p2: None,
                 }));
@@ -134,6 +136,7 @@ impl<T> RevGraph<T> where T: Files{
                 // Set curr rev to the new node
                 let new_node = Rc::new(RefCell::new(RGNode{
                     data: RGData::new(rg_node.borrow_mut().data.track_list.clone()),
+                    id: None,
                     p1: Some(Rc::clone(rg_node)),
                     p2: None,
                 }));
@@ -164,9 +167,9 @@ impl<T> RevGraph<T> where T: Files{
 
 impl<T> Serializable for RevGraph<T> where T: Files{
     fn serialize(&self, file_name: PathBuf) -> std::result::Result<(), Error>{
-        let rg_str = "{}".to_string();
+        let rg_str = "{}";
         if self.graph.is_empty(){
-            if let Err(e) = T::write_to_file(&file_name, &rg_str){
+            if let Err(e) = T::write_to_file(&file_name, rg_str, true){
                 eprintln!("Failed to create/write to file: {}", e);
             }
         }
