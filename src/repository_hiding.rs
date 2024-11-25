@@ -515,11 +515,18 @@ pub fn action_handler<T: Files>(command: String, file_names: Option<Vec<PathBuf>
         }
         "status" => {
             let t_list = rg.curr_rev.clone().unwrap().borrow_mut().data.track_list.clone();
-            let res = serde_json::to_string(&t_list);
-            match res{
-                Ok(msg) => {Ok(msg)}
-                Err(e) => {Err("something went wrong".to_string())}
+            // let res = serde_json::to_string(&t_list);
+            let mut msg = "Tracked files: \n".to_string();
+            for file in &t_list {
+                msg.push_str(" - ");
+                msg.push_str(file.as_os_str().to_str().unwrap());
+                msg.push_str("\n");
             }
+            Ok(msg)
+            // match res{
+            //     Ok(msg) => {Ok(msg)}
+            //     Err(e) => {Err("something went wrong".to_string())}
+            // }
             // Ok("".to_string())
             // todo!()
         }
@@ -542,17 +549,26 @@ pub fn action_handler<T: Files>(command: String, file_names: Option<Vec<PathBuf>
             }
         }
         "log" => {
-            // println!("in log!!!!!!");
-            // println!("\n \n graph:{:?}\n \n \n ", rg.graph);
             let rev = rev_id[0].unwrap();
-            let mut msg = "".to_string(); 
+            let mut msg = "HEAD -> ".to_string();
             let mut info_vec: Vec<(String, RGData)> = Vec::new();
             let res = rg.traverse_rev_graph(rev, info_vec);
+
             match res{
                 Ok(iv) => {
-                    // println!("{:?}", iv.is_empty());
-                    msg = serde_json::to_string(&iv).unwrap_or("Something wrong with parsing the log vec".to_string());
-                    // println!("{:?}", msg.clone());
+                    for (i,v) in iv{
+                        msg.push_str(&i);
+                        msg.push_str(" - ");
+                        for file in &v.track_list {
+                            msg.push_str(file.as_os_str().to_str().unwrap());
+                            msg.push_str(", ");
+                        }
+                        if !&v.track_list.is_empty() {
+                            msg.pop();
+                            msg.pop();
+                        }
+                        msg.push_str("\n");
+                    }
                     Ok(msg.clone())
                 },
                 Err(e) => {
@@ -593,9 +609,7 @@ pub fn action_handler<T: Files>(command: String, file_names: Option<Vec<PathBuf>
                             Some(id) => {
                                 let file_name = k.clone().into_os_string().into_string().unwrap();
                                 let file_1_content = fl.retrieve_version(k, v.clone()).unwrap_or("".to_string());
-                                println!("{:?}", v);
                                 let file_2_content = fl.retrieve_version(k, id.clone()).unwrap_or("".to_string());
-                                println!("{:?}", id);
                                 let diff_res = algorithm_hiding::diff_file_versions(&file_1_content, &file_2_content);
                                 msg = format!("{msg}\n{file_name}:\n{diff_res}");
                             } 
