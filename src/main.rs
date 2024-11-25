@@ -31,6 +31,8 @@ fn main() {
         "cat" => handle_cat_command(&args, repo_name),
         "diff" => handle_diff_command(&args, repo_name),
         "merge" => handle_merge_command(&args, repo_name),
+        "log" => handle_log_command(&args, repo_name),
+        "checkout" => handle_checkout_command(&args, repo_name),
         "add" | "remove" | "commit" => {
             if args.len() < 4 {
                 eprintln!("Usage: {} {} <repository_name> <file_names> [branch_name]", args[0], command);
@@ -157,6 +159,37 @@ fn handle_merge_command(args: &[String], repo_name: &str) {
     }
 }
 
+fn handle_log_command(args: &[String], repo_name: &str){
+    if args.len() < 3 {
+        eprintln!("Usage: {} log <repository_name> <rev_id1>", args[0]);
+        process::exit(1);
+    }
+
+    let rev_id1 = UniqueId::from_string(&args[3]);
+    match repository_hiding::action_handler::<Directory>("log".to_string(), None, None, vec![rev_id1.clone()]) {
+        Ok(result) => println!("{}", result),
+        Err(e) => {
+            eprintln!("Error in action handler: {}", e);
+            process::exit(1);
+        }
+    } 
+}
+
+fn handle_checkout_command(args: &[String], repo_name: &str){
+    if args.len() < 3 {
+        eprintln!("Usage: {} checkout <repository_name> <rev_id1>", args[0]);
+        process::exit(1);
+    }
+
+    let rev_id1 = UniqueId::from_string(&args[3]);
+    match repository_hiding::action_handler::<Directory>("checkout".to_string(), None, None, vec![rev_id1.clone()]) {
+        Ok(result) => println!("{}", result),
+        Err(e) => {
+            eprintln!("Error in action handler: {}", e);
+            process::exit(1);
+        }
+    } 
+}
 // Output handler
 fn output_success(message: &str) {
     println!("{}", message);
