@@ -549,10 +549,31 @@ pub fn action_handler<T: Files>(command: String, file_names: Option<Vec<PathBuf>
             }
         }
         "log" => {
-            let rev = rev_id[0].unwrap();
+            let rev = if rev_id.len() > 0 {
+                match rev_id[0] {
+                    Some(rev_id) => Ok(rev_id),
+                    None => Err(String::from("Missing revision ID"))
+                }
+            } else {
+                if let Some(cur_rev) = rg.curr_rev.clone() {
+                    if let Some(a) = cur_rev.borrow().p1.clone() {
+                        match a.borrow().id.clone() {
+                            Some(rev_id) => Ok(rev_id),
+                            None => Err(String::from("Error occurred"))
+                        }
+                    } else {
+                        Err("No Commits".to_string())
+                    }
+                } else {
+                    Err("Repo Not initialized or tracking files".to_string())
+                }
+            };
             let mut msg = "HEAD -> ".to_string();
             let mut info_vec: Vec<(String, RGData)> = Vec::new();
-            let res = rg.traverse_rev_graph(rev, info_vec);
+            let res = match rev {
+                Ok(rev) => rg.traverse_rev_graph(rev, info_vec),
+                Err(e) => Err(e),
+            };
 
             match res{
                 Ok(iv) => {
@@ -575,8 +596,7 @@ pub fn action_handler<T: Files>(command: String, file_names: Option<Vec<PathBuf>
                     // println!("{:?}", e);
                     Err(e)
                 }
-            };
-            Ok(msg)
+            }
         }
         "heads" => {
             let mut temp_hm: HashMap<String, RGData> = HashMap::new();
