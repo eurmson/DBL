@@ -1,9 +1,9 @@
-using cargo run in the build directory should allow for running the commands from the test cases. \\
+using cargo run in the build directory should allow for running the commands from the test cases. \
 
-to use DBL as command prexix in other directorys, you can use to add it to your path.\\
-Make sure that you replace {{PATH_TO_BUILD_DIRECTORY}} with the location that you cloned the reposity, including the enclosing folder. \\
-cargo build\\
-export "export PATH="${PATH}:{{PATH_TO_BUILD_DIRECOTY}}/target/debug/""\\
+to use DBL as command prexix in other directorys, you can use to add it to your path.\
+Make sure that you replace {{PATH_TO_BUILD_DIRECTORY}} with the location that you cloned the reposity, including the enclosing folder. \
+cargo build\
+export "export PATH="${PATH}:{{PATH_TO_BUILD_DIRECOTY}}/target/debug/""\
 
 
 
