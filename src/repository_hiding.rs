@@ -36,6 +36,7 @@ impl RGData{
         }
     }
     fn add_files(&mut self, file_names: Vec<PathBuf>){
+        
         file_names.iter().for_each(|fname| {
             if !self.track_list.contains(fname){
                 self.track_list.push(fname.clone());
@@ -477,7 +478,6 @@ pub fn action_handler<T: Files>(command: String, file_names: Option<Vec<PathBuf>
             Ok(init_res)
         }
         "add" => {
-            // TODO: DECIDE IF THE CURR-REV SHOULD BE INITIALIZED WHEN THE GRAPH IS INITIALIZED OR WHEN ADD IS CALLED FOR THE FIRST TIME
             match file_names {
                 Some(file_names) => {
                     // println!("{:?}", file_names);
