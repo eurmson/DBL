@@ -273,7 +273,7 @@ impl<T> RevGraph<T> where T: Files{
                                 let p2 = rgn.p2.clone();
                                 match (p1, p2){
                                     (Some(n1), None) => { vec_parents_info.push((n1.borrow_mut().id, None));}
-                                    (Some(n1), Some(n2)) => { vec_parents_info.push((n1.borrow_mut().id, n2.borrow_mut().id));}
+                                    (Some(n1), Some(n2)) => { vec_parents_info.push((n1.borrow().id, n2.borrow().id));}
                                     (None, Some(n2)) => {vec_parents_info.push((None, n2.borrow_mut().id));}
                                     (None, None) => {vec_parents_info.push((None, None))}
                                 }
@@ -523,19 +523,10 @@ pub fn action_handler<T: Files>(command: String, file_names: Option<Vec<PathBuf>
                 msg.push_str("\n");
             }
             Ok(msg)
-            // match res{
-            //     Ok(msg) => {Ok(msg)}
-            //     Err(e) => {Err("something went wrong".to_string())}
-            // }
-            // Ok("".to_string())
-            // todo!()
         }
         "cat" => {
             match (rev_id.get(0).take().unwrap_or(&None), file_names) {
                 (Some(rev_id), Some(file_names)) => {
-                    // println!("{:?}", rg.graph);
-                    // println!("{:?}", rev_id);
-                    // println!("file: {:?}", file_names[0]);
                     let &file_id = rg.graph.get(&rev_id).unwrap().as_ref().unwrap().borrow_mut().data.commit_map.get(&file_names[0]).unwrap();
                     if let Some(file_content) = fl.retrieve_version(file_names[0].as_path(), file_id) {
                         Ok(file_content)
