@@ -515,11 +515,18 @@ pub fn action_handler<T: Files>(command: String, file_names: Option<Vec<PathBuf>
         }
         "status" => {
             let t_list = rg.curr_rev.clone().unwrap().borrow_mut().data.track_list.clone();
-            let res = serde_json::to_string(&t_list);
-            match res{
-                Ok(msg) => {Ok(msg)}
-                Err(e) => {Err("something went wrong".to_string())}
+            // let res = serde_json::to_string(&t_list);
+            let mut msg = "Tracked files: \n".to_string();
+            for file in &t_list {
+                msg.push_str(" - ");
+                msg.push_str(file.as_os_str().to_str().unwrap());
+                msg.push_str("\n");
             }
+            Ok(msg)
+            // match res{
+            //     Ok(msg) => {Ok(msg)}
+            //     Err(e) => {Err("something went wrong".to_string())}
+            // }
             // Ok("".to_string())
             // todo!()
         }
@@ -542,29 +549,60 @@ pub fn action_handler<T: Files>(command: String, file_names: Option<Vec<PathBuf>
             }
         }
         "log" => {
-            // println!("in log!!!!!!");
-            // println!("\n \n graph:{:?}\n \n \n ", rg.graph);
-            let rev = rev_id[0].unwrap();
-            let mut msg = "".to_string(); 
+            let rev = if rev_id.len() > 0 {
+                match rev_id[0] {
+                    Some(rev_id) => Ok(rev_id),
+                    None => Err(String::from("Missing revision ID"))
+                }
+            } else {
+                if let Some(cur_rev) = rg.curr_rev.clone() {
+                    if let Some(a) = cur_rev.borrow().p1.clone() {
+                        match a.borrow().id.clone() {
+                            Some(rev_id) => Ok(rev_id),
+                            None => Err(String::from("Error occurred"))
+                        }
+                    } else {
+                        Err("No Commits".to_string())
+                    }
+                } else {
+                    Err("Repo Not initialized or tracking files".to_string())
+                }
+            };
+            let mut msg = "HEAD -> ".to_string();
             let mut info_vec: Vec<(String, RGData)> = Vec::new();
-            let res = rg.traverse_rev_graph(rev, info_vec);
+            let res = match rev {
+                Ok(rev) => rg.traverse_rev_graph(rev, info_vec),
+                Err(e) => Err(e),
+            };
+
             match res{
                 Ok(iv) => {
-                    // println!("{:?}", iv.is_empty());
-                    msg = serde_json::to_string(&iv).unwrap_or("Something wrong with parsing the log vec".to_string());
-                    // println!("{:?}", msg.clone());
+                    for (i,v) in iv{
+                        msg.push_str(&i);
+                        msg.push_str(" - ");
+                        for file in &v.track_list {
+                            msg.push_str(file.as_os_str().to_str().unwrap());
+                            msg.push_str(", ");
+                        }
+                        if !&v.track_list.is_empty() {
+                            msg.pop();
+                            msg.pop();
+                        }
+                        msg.push_str("\n");
+                    }
                     Ok(msg.clone())
                 },
                 Err(e) => {
                     // println!("{:?}", e);
                     Err(e)
                 }
-            };
-            Ok(msg)
+            }
         }
         "heads" => {
             let mut temp_hm: HashMap<String, RGData> = HashMap::new();
+            // print!("{:?}", rg.heads);
             rg.heads.iter().for_each(|(k, v)| {temp_hm.insert(k.clone(), v.clone().unwrap().borrow_mut().data.clone());});
+            print!("{:?}", rg.heads.keys());
             let msg = serde_json::to_string(&temp_hm);
             match msg {
                 Ok(m) => Ok(m),
@@ -577,9 +615,11 @@ pub fn action_handler<T: Files>(command: String, file_names: Option<Vec<PathBuf>
             // Retrieve nodes associated with the two revs
             // Get the commit map from each node
             // Call diff on each pair of files from the commit map
-            // If file exists in one commit map but not in other then 
+            // If file exists in one commit map but not in other then
+            println!("{:?}", rev_id);
             let comm_op_1 = rg.graph.get(&rev_id[0].unwrap());
-            let comm_op_2 = rg.graph.get(&rev_id[0].unwrap());
+            println!("{:?}", rg.graph.keys());
+            let comm_op_2 = rg.graph.get(&rev_id[1].unwrap());
             let res = match (comm_op_1, comm_op_2){
                 (Some(comm_node_1), Some(comm_node_2)) => {
                     let comm_map_1 =  comm_node_1.clone().unwrap().borrow_mut().data.commit_map.clone();

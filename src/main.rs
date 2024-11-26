@@ -31,14 +31,13 @@ fn main() {
         "cat" => handle_cat_command(&args),
         "diff" => handle_diff_command(&args),
         "merge" => handle_merge_command(&args),
-        "log" => handle_log_command(&args, repo_name),
+        "log" => handle_log_command(&args),
         "checkout" => handle_checkout_command(&args, repo_name),
         "add" | "remove" => {
             if args.len() < 3 {
                 eprintln!("Usage: {} {} <file_names>", args[0], command);
                 process::exit(1);
             }
-            println!("{:?}", &args[3..args.len()]);
             let file_names: Vec<PathBuf> = args[2..args.len()].iter().map(|a|PathBuf::from(a)).collect();
             match repository_hiding::action_handler::<Directory>(command.to_string(), Some(file_names), None, vec![]) {
                 Ok(result) => println!("{}", result),
@@ -48,7 +47,7 @@ fn main() {
                 }
             }
         },
-        "commit" => {
+        "commit"|"heads" => {
             match repository_hiding::action_handler::<Directory>(command.to_string(), None, None, vec![]) {
                 Ok(result) => println!("{}", result),
                 Err(e) => {
@@ -133,15 +132,14 @@ fn handle_cat_command(args: &[String]) {
 // Handle 'diff' command
 fn handle_diff_command(args: &[String]) {
     if args.len() < 4 {
-        eprintln!("Usage: {} diff <file_name1> <rev_id1> <rev_id2>", args[0]);
+        eprintln!("Usage: {} diff <rev_id1> <rev_id2>", args[0]);
         process::exit(1);
     }
 
-    let file_name = &args[2];
-    let rev_id1 = UniqueId::from_string(&args[3]);
-    let rev_id2 = UniqueId::from_string(&args[4]);
+    let rev_id1 = UniqueId::from_string(&args[2]);
+    let rev_id2 = UniqueId::from_string(&args[3]);
 
-    match repository_hiding::action_handler::<Directory>("diff".to_string(), Some(vec![PathBuf::from(file_name.clone())]), None, vec![rev_id1.clone(), rev_id2.clone()]) {
+    match repository_hiding::action_handler::<Directory>("diff".to_string(), None, None, vec![rev_id1.clone(), rev_id2.clone()]) {
         Ok(result) => println!("{}", result),
         Err(e) => {
             eprintln!("Error in action handler: {}", e);
@@ -153,15 +151,14 @@ fn handle_diff_command(args: &[String]) {
 // Handle 'merge' command
 fn handle_merge_command(args: &[String]) {
     if args.len() < 4 {
-        eprintln!("Usage: {} merge <file_name1> <rev_id1> <rev_id2>", args[0]);
+        eprintln!("Usage: {} merge <rev_id1> <rev_id2>", args[0]);
         process::exit(1);
     }
 
-    let file_name = PathBuf::from(&args[2]);
-    let rev_id1 = UniqueId::from_string(&args[3]);
-    let rev_id2 = UniqueId::from_string(&args[4]);
+    let rev_id1 = UniqueId::from_string(&args[2]);
+    let rev_id2 = UniqueId::from_string(&args[3]);
 
-    match repository_hiding::action_handler::<Directory>("merge".to_string(), Some(vec![file_name.clone()]), None, vec![rev_id1.clone(), rev_id2.clone()]) {
+    match repository_hiding::action_handler::<Directory>("merge".to_string(), None, None, vec![rev_id1.clone(), rev_id2.clone()]) {
         Ok(result) => println!("{}", result),
         Err(e) => {
             eprintln!("Error in action handler: {}", e);
@@ -170,14 +167,17 @@ fn handle_merge_command(args: &[String]) {
     }
 }
 
-fn handle_log_command(args: &[String], repo_name: &str){
-    if args.len() < 3 {
-        eprintln!("Usage: {} log <repository_name> <rev_id1>", args[0]);
+fn handle_log_command(args: &[String]){
+    if args.len() < 2 {
+        eprintln!("Usage: {} log [rev_id1]", args[0]);
         process::exit(1);
     }
 
-    let rev_id1 = UniqueId::from_string(&args[3]);
-    match repository_hiding::action_handler::<Directory>("log".to_string(), None, None, vec![rev_id1.clone()]) {
+    match if args.len() < 3 {
+        repository_hiding::action_handler::<Directory>("log".to_string(), None, None, vec![])
+    } else {
+        repository_hiding::action_handler::<Directory>("log".to_string(), None, None, vec![UniqueId::from_string(&args[2])])
+    } {
         Ok(result) => println!("{}", result),
         Err(e) => {
             eprintln!("Error in action handler: {}", e);
@@ -188,11 +188,10 @@ fn handle_log_command(args: &[String], repo_name: &str){
 
 fn handle_checkout_command(args: &[String], repo_name: &str){
     if args.len() < 3 {
-        eprintln!("Usage: {} checkout <repository_name> <rev_id1>", args[0]);
+        eprintln!("Usage: {} checkout <rev_id1>", args[0]);
         process::exit(1);
     }
-
-    let rev_id1 = UniqueId::from_string(&args[3]);
+    let rev_id1 = UniqueId::from_string(&args[2]);
     match repository_hiding::action_handler::<Directory>("checkout".to_string(), None, None, vec![rev_id1.clone()]) {
         Ok(result) => println!("{}", result),
         Err(e) => {
