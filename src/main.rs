@@ -151,15 +151,14 @@ fn handle_diff_command(args: &[String]) {
 // Handle 'merge' command
 fn handle_merge_command(args: &[String]) {
     if args.len() < 4 {
-        eprintln!("Usage: {} merge <file_name1> <rev_id1> <rev_id2>", args[0]);
+        eprintln!("Usage: {} merge <rev_id1> <rev_id2>", args[0]);
         process::exit(1);
     }
 
-    let file_name = PathBuf::from(&args[2]);
-    let rev_id1 = UniqueId::from_string(&args[3]);
-    let rev_id2 = UniqueId::from_string(&args[4]);
+    let rev_id1 = UniqueId::from_string(&args[2]);
+    let rev_id2 = UniqueId::from_string(&args[3]);
 
-    match repository_hiding::action_handler::<Directory>("merge".to_string(), Some(vec![file_name.clone()]), None, vec![rev_id1.clone(), rev_id2.clone()]) {
+    match repository_hiding::action_handler::<Directory>("merge".to_string(), None, None, vec![rev_id1.clone(), rev_id2.clone()]) {
         Ok(result) => println!("{}", result),
         Err(e) => {
             eprintln!("Error in action handler: {}", e);
